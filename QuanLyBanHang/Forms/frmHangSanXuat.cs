@@ -1,5 +1,4 @@
-﻿using QuanLyBanHang.Data; // Đảm bảo bạn đã có namespace này cho DbContext
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -8,158 +7,238 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using QuanLyBanHang.Data;
+using ClosedXML.Excel;
 
 namespace QuanLyBanHang.Forms
 {
-    public partial class frmHangSanXuat : Form
+    public partial class FrmHangSanXuat : Form
     {
-        // Khởi tạo các biến dùng chung
-        QLBHDbContext context = new QLBHDbContext();
-        bool xuLyThem = false;
+        QLBHDbContext context = new QLBHDbContext(); // Khởi tạo biến ngữ cảnh CSDL 
+        bool xuLyThem = false; // Kiểm tra có nhấn vào nút Thêm hay không? 
         int id;
-
-        public frmHangSanXuat()
+        public FrmHangSanXuat()
         {
             InitializeComponent();
         }
 
-        /// <summary>
-        /// Hàm hỗ trợ bật/tắt các controls theo trạng thái xử lý
-        /// </summary>
+        private void dgvHangSanXuat_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                DataGridViewRow row = dgvHangSanXuat.Rows[e.RowIndex];
+                txtTenHangSanXuat.Text = row.Cells["TenHangSanXuat"].Value?.ToString();
+
+            }
+        }
+        public void Reset()
+        {
+            txtTenHangSanXuat.Text = string.Empty;
+        }
         private void BatTatChucNang(bool giaTri)
         {
-            // Nhóm các nút/ô văn bản cần sáng khi Thêm/Sửa
             btnLuu.Enabled = giaTri;
             btnHuyBo.Enabled = giaTri;
             txtTenHangSanXuat.Enabled = giaTri;
 
-            // Nhóm các nút cần mờ khi đang Thêm/Sửa
             btnThem.Enabled = !giaTri;
             btnSua.Enabled = !giaTri;
             btnXoa.Enabled = !giaTri;
         }
-
-        private void frmHangSanXuat_Load(object sender, EventArgs e)
+        private void FrmHangSanXuat_Load(object sender, EventArgs e)
         {
-            // 1. Thiết lập trạng thái ban đầu của các nút
             BatTatChucNang(false);
 
-            // 2. Lấy danh sách dữ liệu từ CSDL
-            List<HangSanXuat> dsHang = context.HangSanXuat.ToList();
+            List<HangSanXuat> lsp = new List<HangSanXuat>();
+            lsp = context.HangSanXuat.ToList();
 
-            // 3. Sử dụng BindingSource để đồng bộ dữ liệu giữa DataGridView và TextBox
             BindingSource bindingSource = new BindingSource();
-            bindingSource.DataSource = dsHang;
+            bindingSource.DataSource = lsp;
 
-            // Xóa các binding cũ nếu có và thêm mới cho txtTenHangSanXuat
             txtTenHangSanXuat.DataBindings.Clear();
             txtTenHangSanXuat.DataBindings.Add("Text", bindingSource, "TenHangSanXuat", false, DataSourceUpdateMode.Never);
 
-            // Hiển thị lên DataGridView
-            dataGridView.DataSource = bindingSource;
+            dgvHangSanXuat.DataSource = bindingSource;
         }
 
         private void btnThem_Click(object sender, EventArgs e)
         {
+            Reset();
             xuLyThem = true;
             BatTatChucNang(true);
-            txtTenHangSanXuat.Clear();
-            txtTenHangSanXuat.Focus();
         }
 
         private void btnSua_Click(object sender, EventArgs e)
         {
-            if (dataGridView.CurrentRow == null) return;
-
+            if (dgvHangSanXuat.CurrentRow == null)
+            {
+                MessageBox.Show("Vui lòng chọn một dòng để sửa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             xuLyThem = false;
             BatTatChucNang(true);
-            // Lấy ID của dòng đang chọn để chuẩn bị cập nhật
-            id = Convert.ToInt32(dataGridView.CurrentRow.Cells["ID"].Value);
+            id = Convert.ToInt32(dgvHangSanXuat.CurrentRow.Cells["ID"].Value.ToString());
         }
 
         private void btnLuu_Click(object sender, EventArgs e)
         {
-            // Kiểm tra thông tin bắt buộc
-            if (string.IsNullOrWhiteSpace(txtTenHangSanXuat.Text))
-            {
-                MessageBox.Show("Vui lòng nhập tên hãng sản xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtTenHangSanXuat.Focus();
-                return;
-            }
 
-            try
+            if (string.IsNullOrWhiteSpace(txtTenHangSanXuat.Text))
+                MessageBox.Show("Vui lòng nhập tên hãng sản xuất?", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            else
             {
                 if (xuLyThem)
                 {
-                    // Xử lý Thêm mới
-                    HangSanXuat hsx = new HangSanXuat();
-                    hsx.TenHangSanXuat = txtTenHangSanXuat.Text;
-                    context.HangSanXuat.Add(hsx);
+                    HangSanXuat lsp = new HangSanXuat();
+                    lsp.TenHangSanXuat = txtTenHangSanXuat.Text;
+                    context.HangSanXuat.Add(lsp);
+
+                    context.SaveChanges();
                 }
                 else
                 {
-                    // Xử lý Cập nhật
-                    HangSanXuat hsx = context.HangSanXuat.Find(id);
-                    if (hsx != null)
+                    HangSanXuat lsp = context.HangSanXuat.Find(id);
+                    if (lsp != null)
                     {
-                        hsx.TenHangSanXuat = txtTenHangSanXuat.Text;
-                        context.HangSanXuat.Update(hsx);
+                        lsp.TenHangSanXuat = txtTenHangSanXuat.Text;
+                        context.HangSanXuat.Update(lsp);
+
+                        context.SaveChanges();
                     }
                 }
 
-                context.SaveChanges();
-                MessageBox.Show("Lưu dữ liệu thành công!", "Thông báo");
-
-                // Tải lại form để cập nhật danh sách
-                frmHangSanXuat_Load(sender, e);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Lỗi khi lưu dữ liệu: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                FrmHangSanXuat_Load(sender, e);
             }
         }
 
         private void btnXoa_Click(object sender, EventArgs e)
         {
-            if (dataGridView.CurrentRow == null) return;
-
-            if (MessageBox.Show("Bạn có chắc chắn muốn xóa hãng sản xuất này?", "Xác nhận xóa",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            if (MessageBox.Show("Xác nhận xóa loại sản phẩm?", "Xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
             {
-                try
+                id = Convert.ToInt32(dgvHangSanXuat.CurrentRow.Cells["ID"].Value.ToString());
+                HangSanXuat lsp = context.HangSanXuat.Find(id);
+                if (lsp != null)
                 {
-                    id = Convert.ToInt32(dataGridView.CurrentRow.Cells["ID"].Value);
-                    HangSanXuat hsx = context.HangSanXuat.Find(id);
+                    context.HangSanXuat.Remove(lsp);
+                }
+                context.SaveChanges();
 
-                    if (hsx != null)
-                    {
-                        context.HangSanXuat.Remove(hsx);
-                        context.SaveChanges();
-                        frmHangSanXuat_Load(sender, e);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Không thể xóa do hãng này đang được sử dụng ở bảng khác!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                FrmHangSanXuat_Load(sender, e);
             }
         }
 
         private void btnHuyBo_Click(object sender, EventArgs e)
         {
-            // Tải lại form để hủy các thay đổi đang nhập dở
-            frmHangSanXuat_Load(sender, e);
+            FrmHangSanXuat_Load(sender, e);
         }
 
         private void btnThoat_Click(object sender, EventArgs e)
         {
-            this.Close();
+            DialogResult traloi = MessageBox.Show("Bạn có chắc chắn muốn đóng không?", "Trả lời", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (traloi == DialogResult.Yes)
+                this.Close();
         }
 
-        // Các sự kiện không dùng tới bạn có thể để trống hoặc xóa (nếu đã xóa trong Designer)
-        private void dataGridView_CellContentClick(object sender, DataGridViewCellEventArgs e) { }
-        private void groupBox1_Enter(object sender, EventArgs e) { }
-        private void txtTenHangSanXuat_TextChanged(object sender, EventArgs e) { }
+        private void btnNhap_Click(object sender, EventArgs e)
+        {
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Title = "Nhập dữ liệu từ tập tin Excel";
+            openFileDialog.Filter = "Tập tin Excel|*.xls;*.xlsx";
+            openFileDialog.Multiselect = false;
+
+            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    DataTable table = new DataTable();
+                    using (XLWorkbook workbook = new XLWorkbook(openFileDialog.FileName))
+                    {
+                        IXLWorksheet worksheet = workbook.Worksheet(1);
+                        bool firstRow = true;
+                        string readRange = "1:1";
+
+                        foreach (IXLRow row in worksheet.RowsUsed())
+                        {
+                            if (firstRow)
+                            {
+                                readRange = string.Format("{0}:{1}", 1, row.LastCellUsed().Address.ColumnNumber);
+                                foreach (IXLCell cell in row.Cells(readRange))
+                                    table.Columns.Add(cell.Value.ToString());
+                                firstRow = false;
+                            }
+                            else
+                            {
+                                table.Rows.Add();
+                                int cellIndex = 0;
+                                foreach (IXLCell cell in row.Cells(readRange))
+                                {
+                                    table.Rows[table.Rows.Count - 1][cellIndex] = cell.Value.ToString();
+                                    cellIndex++;
+                                }
+                            }
+                        }
+
+                        if (table.Rows.Count > 0)
+                        {
+                            foreach (DataRow r in table.Rows)
+                            {
+                                HangSanXuat hsx = new HangSanXuat();
+                                hsx.TenHangSanXuat = r["TenHangSanXuat"].ToString();
+                                context.HangSanXuat.Add(hsx);
+                            }
+                            context.SaveChanges();
+                            MessageBox.Show("Đã nhập thành công " + table.Rows.Count + " dòng.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            FrmHangSanXuat_Load(sender, e);
+                        }
+                        else if (firstRow)
+                        {
+                            MessageBox.Show("Tập tin Excel rỗng.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                }
+            }
+        }
+
+        private void btnXuat_Click(object sender, EventArgs e)
+        {
+
+            SaveFileDialog saveFileDialog = new SaveFileDialog();
+            saveFileDialog.Title = "Xuất dữ liệu ra tập tin Excel";
+            saveFileDialog.Filter = "Tập tin Excel|*.xls;*.xlsx";
+            saveFileDialog.FileName ="Hàng Sản Xuất_" + DateTime.Now.ToShortDateString().Replace("/", "_") + ".xlsx";
+            if (saveFileDialog.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    DataTable table = new DataTable();
+                    table.Columns.AddRange(new DataColumn[2] {
+                        new DataColumn("ID", typeof(int)),
+                        new DataColumn("TenHangSanXuat", typeof(string))
+                    });
+
+                    var listHSX = context.HangSanXuat.ToList();
+                    foreach (var item in listHSX)
+                    {
+                        table.Rows.Add(item.ID, item.TenHangSanXuat);
+                    }
+
+                    using (XLWorkbook wb = new XLWorkbook())
+                    {
+                        var sheet = wb.Worksheets.Add(table, "HangSanXuat");
+                        sheet.Columns().AdjustToContents();
+                        wb.SaveAs(saveFileDialog.FileName);
+                        MessageBox.Show("Đã xuất dữ liệu ra tập tin Excel thành công.", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                }
+            }
+        }
     }
 }
